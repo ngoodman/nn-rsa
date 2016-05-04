@@ -1,0 +1,101 @@
+var data = [0]
+
+  var worldPrior = function() {
+   var people = [Vector([1,0,0]),Vector([0,1,0]),Vector([0,0,1])]
+   var num_nice_people = randomInteger(people.length) //3 people.. 0-3 can be nice.
+   return people[num_nice_people]
+  }
+
+  var utterancePrior = function() {
+    var utterances = [Vector([1,0,0]),Vector([0,1,0]),Vector([0,0,1])]
+    var i = randomInteger(utterances.length)
+    return utterances[i]
+  }
+
+
+  var literalListener = cache(function(utterance,lexicon,world_embedding) {
+    Enumerate(function(){
+      var world = worldPrior()
+      var m = T.dot(lexicon,utterance)
+      var w = T.dot(world_embedding,world)
+      factor(T.sumreduce(T.dot(T.transpose(m),w)))
+
+      return world
+    })
+  })
+
+  var speaker = cache(function(world,lexicon,world_embedding) {
+  Enumerate(function(){
+    var utterance = utterancePrior()
+    var L = literalListener(utterance,lexicon,world_embedding)
+
+    factor(L.score([],world))
+
+    return utterance
+  })})
+
+  var listener = cache(function(utterance,lexicon,world_embedding) {
+  Enumerate(function(){
+    var world = worldPrior()
+    var S = speaker(world,lexicon,world_embedding)
+    factor(S.score([],utterance))
+    return world
+  })
+})
+
+  // a scalar param, init. to zero
+  //var mean = param([3,1],0,10);
+  //var m = param([3,1],0,10);
+  // a tensor param, with dimension [5, 1], init to all zeros
+  // var x = param([5, 1])
+  // ... all ones:
+  // var x = param([5, 1], 1)
+  // ... or init with draws from Gaussian(0, 0.1^2)
+  // var x = param([5, 1], 0, 0.1)
+
+
+var sampleMatrixGaussian = function(dims,mean,variance,guide_mean){
+  var length = dims[0]*dims[1]
+  var g = sample(diagCovGaussianERP,[Vector(repeat(length, constF(mean))),Vector(repeat(length, constF(variance)))],
+    {guide: [diagCovGaussianERP, [T.reshape(guide_mean,[length,1]),Vector(repeat(length, constF(0.001)))]]})
+  return T.reshape(g,dims)
+}
+
+var model = function() {
+
+  var lexicon_mean = param([3,3],0,0.1)
+  var world_mean = param([3,3],0,0.1)
+
+  var lex_mean = sampleMatrixGaussian([3,3],0,10,lexicon_mean)
+  //var lex_mean = T.reshape(sample(diagCovGaussianERP,[Vector(repeat(9, constF(0))),Vector(repeat(9, constF(10)))],
+  //  {guide: [diagCovGaussianERP, [T.reshape(lexicon_mean,[9,1]),Vector(repeat(9, constF(0.0001)))]]}), [3,3])
+
+
+  var w_mean = sampleMatrixGaussian([3,3],0,10,world_mean)
+  //var w_mean = T.reshape(sample(diagCovGaussianERP,[Vector(repeat(9, constF(0))),Vector(repeat(9, constF(10)))],
+  //  {guide: [diagCovGaussianERP, [T.reshape(world_mean,[9,1]),Vector(repeat(9, constF(0.0001)))]]}), [3,3])
+
+
+  var l1 = listener(Vector([0,0,1]),lex_mean,w_mean)
+  var l2 = listener(Vector([0,1,0]),lex_mean,w_mean)
+  var l3 = listener(Vector([1,0,0]),lex_mean,w_mean)
+  var l4 = literalListener(Vector([0,0,1]),lex_mean,w_mean)
+  console.log(l4.hist)
+  console.log('h')
+  console.log(l1.hist)
+  //console.log(l4.score([], Vector([0,0,1])))
+  //var l4 = literalListener(Vector([0,0,1]),lex_mean,w_mean)
+  //console.log(l4.score([],Vector([0,0,1])))
+
+  //console.log(l2.score([], Vector([0,1,0])))
+  //console.log(l3.score([], Vector([1,0,0])))
+  factor(l1.score([], Vector([0,0,1]))*10 +l1.score([], Vector([0,1,0]))*10+ l2.score([], Vector([1,0,0]))*20 + l1.score([], Vector([1,0,0]))*5)
+
+  return lex_mean;
+};
+
+// VI.
+var params = Optimize(model, {steps: 2000, method: {gd: {stepSize: 0.01}}, estimator: {ELBO: {samples: 1}}});
+
+// Optimized params.
+console.log(JSON.stringify(params))

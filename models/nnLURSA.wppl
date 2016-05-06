@@ -24,7 +24,7 @@ var worldPrior = function() {
 var utterancePrior = function() {
   var utterances = [Vector([1,0,0]),Vector([0,1,0]),Vector([0,0,1])]
   var i = randomInteger(utterances.length)
-  return utterances[i]
+  return nn_utils.sample_array(utterances)
 }
 
 
@@ -82,15 +82,17 @@ var model = function() {
   var b0_offsets = repeat(num_samples,function(){return sample(matrixGaussianERP,0,1,b0.size)})
   var b1_offsets = repeat(num_samples,function(){return sample(matrixGaussianERP,0,1,b1.size)})
 
-  var l1s = mapN(function(n){return listener(Vector([0,0,1])),[W0+W0_offsets[n],W1+W1_offsets[n]],[b0+b0_offsets[n],b1+b1_offsets[n]]},
+  console.log(W0_offsets)
+  var l1s = mapN(function(n){return listener(Vector([0,0,1]),[W0+W0_offsets[n],W1+W1_offsets[n]],[b0+b0_offsets[n],b1+b1_offsets[n]])},
     num_samples)
+  console.log(l1s)
 
-  var avg_l1 = function(u){-1*Math.log(num_samples)+util.logsumexp(map(function(x){return x.score([],Vector([0,0,1]))},l1s))}
+  var avg_l1 = function(w){return -1*Math.log(num_samples)+util.logsumexp(map(function(x){return x.score([],w)},l1s))}
   //var l1 = listener(Vector([0,0,1]),[W0,W1],[b0,b1])
   //var l2 = listener(Vector([0,1,0]),[W0,W1],[b0,b1])
 
 
-  factor(l1.score([], Vector([0,0,1]))*10+l1.score([], Vector([1,0,0]))*10+l2.score([], Vector([0,1,0]))*10)
+  factor(avg_l1(Vector([0,0,1])))
 
   return W0;
 };

@@ -29,12 +29,12 @@ var network = function(x, W, b) {
 var worlds = [Vector([1,0,0]),Vector([0,1,0]),Vector([0,0,1])]
 
 var knowledge_states1 = 
-  [[Vector([1,0,0])],
-  [Vector([0,1,0])],
-  [Vector([0,0,1])]]
+  [[Vector([1,0,0])],//some not all
+  [Vector([0,1,0])],//some not all
+  [Vector([0,0,1])]]// all
 var knowledge_states2 = 
   [[Vector([1,0,0]),Vector([0,1,0]),Vector([0,0,1])],
-  [Vector([0,0,1])]]
+  [Vector([0,0,1])]]//all
 
 var knowledgePrior = function(knowledge_states){
   //var i = randomInteger(knowledge_states.length)
@@ -43,24 +43,6 @@ var knowledgePrior = function(knowledge_states){
 }
 
 
-var utterancePrior = function() {
-  var utterances = [Vector([1,0,0]),Vector([0,1,0]),Vector([0,0,1])]
-  //var i = randomInteger(utterances.length)
-  return sampleArray(utterances)
-}
-
-//knowledge_state is a set of worlds
-var speakerUtility = function(listener,knowledge_state) {
-  var num_possible_worlds = knowledge_state.length
-  var log_probs = map(function(w){return listener.score([],w)},knowledge_state)
-  //console.log(log_probs)
-  var sum_logs = sumScalars(log_probs)
-  //console.log(sum_logs)
-  //console.log(map(function(w){return listener.score([],w)},knowledge_state))
-  return ad.scalar.add(sum_logs,-1*Math.log(num_possible_worlds))
-
-}
-
 var literalListener = cache(function(utterance,W,b,knowledge_states) {
   Enumerate(function(){
     var knowledge_state = knowledgePrior(knowledge_states)
@@ -68,36 +50,21 @@ var literalListener = cache(function(utterance,W,b,knowledge_states) {
 
     factor(network([world,utterance],W,b))
 
-    return world
+    return knowledge_state
   })
 })
 
-var speaker = cache(function(knowledge_state,W,b,knowledge_states) {
-Enumerate(function(){
-  var utterance = utterancePrior()
-  var L = literalListener(utterance,W,b,knowledge_states)
-
-  factor(5*speakerUtility(L,knowledge_state))
-
-  return utterance
-})})
-
-var listener = cache(function(utterance,W,b,knowledge_states) {
-Enumerate(function(){
-  var knowledge_state = knowledgePrior(knowledge_states)
-  var S = speaker(knowledge_state,W,b,knowledge_states)
-
-  factor(S.score([],utterance))
-
-  return knowledge_state
-})
-})
 
 var sampleMatrixGaussian = function(dims,mean,variance,guide_mean){
   var length = dims[0]*dims[1]
   var g = sample(diagCovGaussianERP,[Vector(repeat(length, constF(mean))),Vector(repeat(length, constF(variance)))],
     {guide: [diagCovGaussianERP, [T.reshape(guide_mean,[length,1]),Vector(repeat(length, constF(0.001)))]]})
   return T.reshape(g,dims)
+}
+
+var utterance_dict = {'some':Vector([0,0,1]),'all':Vector([1,0,0])}
+var utt = function(u){
+  return utterance_dict[u]
 }
 
 var model = function() {
@@ -114,13 +81,13 @@ var model = function() {
   var b1 = sampleMatrixGaussian([1,1],0,1,b1_var)
 
 
-  var l1 = listener(Vector([0,0,1]),[W0,W1],[b0,b1],knowledge_states1)
-  var l2 = listener(Vector([1,0,0]),[W0,W1],[b0,b1],knowledge_states1)
+  var l1 = literalListener(utt('some'),[W0,W1],[b0,b1],knowledge_states1)
+  var l2 = literalListener(utt('all'),[W0,W1],[b0,b1],knowledge_states1)
 
-  var l3 = listener(Vector([0,0,1]),[W0,W1],[b0,b1],knowledge_states2)
-  var l4 = listener(Vector([1,0,0]),[W0,W1],[b0,b1],knowledge_states2)
+  var l3 = literalListener(utt('some'),[W0,W1],[b0,b1],knowledge_states2)
+  var l4 = literalListener(utt('all'),[W0,W1],[b0,b1],knowledge_states2)
 
-  var lit = literalListener(Vector([0,0,1]),[W0,W1],[b0,b1],knowledge_states1)
+  var lit = literalListener(utt('some'),[W0,W1],[b0,b1],knowledge_states1)
 
   console.log(lit.hist)
   factor(l3.score([], knowledge_states2[0])*3+

@@ -2,9 +2,16 @@
 
 Our general goal is to determine whether RSA provides a good inductive bias for learning. There are several dimensions along which RSA may improve learning:
 
-1. Training set compression/memorization. RSA may reduce the number of training examples necessary to learn correct interpretations for utterances in the training data.
+1. Training set compression/memorization. RSA may reduce the number of training examples necessary to learn correct interpretations for utterances which appear in the training data.
 2. Generalization to new utterance/context pairs. Given an utterance U that has been observed in particular contexts, and a context C which has been observed for particular utterances (but not utterance U), RSA may lead to better interpretations of U in context C. More generally, for n utterances and k contexts, there are n*k utterance-context pairs; RSA may make learning linear (or something similar) in n and k. 
 3. Generalization to new contexts. If the model has learned to interpret utterances in a particular set of contexts, it may be able to perform 0-shot learning for new contexts, i.e. interpret the utterances correctly in contexts which were not observed in the training set. 
 4. Generalization to new observation types. We may not always observe a distribution over worlds (or a sample from this distribution) given an utterance. Instead, we may observe an action taken by the listener, given a particular goal and set of affordances. RSA may improve generalization to new tasks, i.e. predicting listener actions given new goals and affordances.
 
-#Speaker knowledge
+###Speaker knowledge
+
+We expect improved generalization when assumptions about speaker knowledgeability are varied. The definition of S1's utility function imposes a strong inductive bias on the learning problem. If the speaker is observed using an utterance U in knowledge state K, or if the listener interprets U as K, then this implies that every world in the support of K is literally compatible with U. 
+
+####Learning scenarios
+1. Rapid semantic disambiguation. Suppose that we have observed listener interpretations given the assumption of speaker knowledgeability, e.g. we have observed uses of ``some" and "all" given the assumption that the speaker knows the exact state. There will be two explanations of the speaker's use of ``some" to mean ``not all": either ``some" means ``not all", or the listener is drawing an implicature. A single observation of ``some" being used in a context with weaker assumptions about speaker knowledgeability will disambiguate this: if ``some" is interpreted as the ignorant knowledge state, then we learn that ``some" includes ``all" in its support. This single observation is all that the listener needs to correctly interpret ``some" in the non-knowledgeable context.
+2. Generalization to stronger knowledge states. Suppose that we observe the use of ``some" and ``all" in the absence of speaker knowledgeability, so that ``some" is interpreted as the ignorant knowledge state, and ``all" is interpreted as ``all." Then the model will know that ``not all" and ``all" are included in the support of ``some". This will allow correct generalization to the unobserved knowledge state in which the speaker knows ``not all". In this knowledge state, the model will correctly predict that the speaker will say ``some."
+3. Generalization to disjunctive knowledge states. Suppose that we have observed the speaker use ``some" to mean that 1 student passed the test, and also observed ``some" used to mean 2. Then the model will know that both 1 and 2 are in the support of ``some", and hence will predict that ``some" can also be used to mean ``1 or 2," even if this disjunctive knowledge state has not previously been observed.
